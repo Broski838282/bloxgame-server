@@ -27,7 +27,7 @@
     GM_addStyle(`
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
-.bg-panel{position:fixed;top:80px;right:20px;width:320px;background:rgba(8,8,12,0.92);border:1px solid rgba(255,255,255,0.08);font-family:'Inter',sans-serif;color:#fff;z-index:100000;transition:all 0.35s cubic-bezier(0.22,1,0.36,1);opacity:0;pointer-events:none;transform:translateY(10px) scale(0.97);border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,0.5);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);overflow:hidden}
+.bg-panel{position:fixed;top:80px;left:20px;width:320px;background:rgba(8,8,12,0.92);border:1px solid rgba(255,255,255,0.08);font-family:'Inter',sans-serif;color:#fff;z-index:100000;transition:all 0.35s cubic-bezier(0.22,1,0.36,1);opacity:0;pointer-events:none;transform:translateY(10px) scale(0.97);border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,0.5);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);overflow:hidden}
 .bg-panel.bg-visible{opacity:1;pointer-events:auto;transform:translateY(0) scale(1)}
 .bg-panel *{box-sizing:border-box}
 
@@ -109,7 +109,7 @@
 .bg-log::-webkit-scrollbar{width:3px}
 .bg-log::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15);border-radius:3px}
 
-.bg-toggle{position:fixed;bottom:20px;right:20px;width:44px;height:44px;background:linear-gradient(135deg,#a78bfa,#6366f1);border:none;color:#fff;font-size:18px;cursor:pointer;z-index:100001;display:flex;align-items:center;justify-content:center;opacity:0;border-radius:50%;box-shadow:0 4px 20px rgba(99,102,241,0.4);transition:all 0.2s}
+.bg-toggle{position:fixed;bottom:20px;left:20px;width:44px;height:44px;background:linear-gradient(135deg,#a78bfa,#6366f1);border:none;color:#fff;font-size:18px;cursor:pointer;z-index:100001;display:flex;align-items:center;justify-content:center;opacity:0;border-radius:50%;box-shadow:0 4px 20px rgba(99,102,241,0.4);transition:all 0.2s}
 .bg-toggle.bg-visible{opacity:1}
 .bg-toggle:hover{transform:scale(1.1);box-shadow:0 6px 30px rgba(99,102,241,0.6)}
 
