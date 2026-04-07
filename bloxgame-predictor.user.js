@@ -13,7 +13,7 @@
 (function () {
     'use strict';
 
-    var SERVER_URL = 'http://localhost:4000';
+    var SERVER_URL = 'https://bloxgame-server-production.up.railway.app';
     var GRID = 16; // default 4x4
     var panelVisible = false;
     var predictionActive = false;
@@ -204,6 +204,13 @@
                                 window.postMessage({ type: '__bg_crash', data: d }, '*');
                             }).catch(function () { });
                         }
+                        // Blackjack
+                        if (url.indexOf('/games/blackjack') !== -1 || url.indexOf('blackjack') !== -1) {
+                            var clone4 = res.clone();
+                            clone4.json().then(function (d) {
+                                window.postMessage({ type: '__bg_blackjack', data: d }, '*');
+                            }).catch(function () { });
+                        }
                     }
                 } catch (e) { }
                 return res;
@@ -274,6 +281,10 @@
                 _interceptedCrashData = d;
                 log('crash data intercepted · ' + d.history.length + ' rounds');
             }
+        }
+
+        if (e.data.type === '__bg_blackjack') {
+            handleBlackjackData(e.data.data);
         }
     });
 
@@ -573,6 +584,174 @@
         el.textContent = msg;
     }
 
+    // ═══ BLACKJACK EV ENGINE (LOCAL) ═══
+
+    var _activeBjGame = null;
+    var _lastBjState = '';
+    var _bjIsCalculating = false;
+    var _bjCalcTimeout = null;
+
+    function handleBlackjackData(payload) {
+        var game = payload.game || payload;
+        if (!game || !game.player || (!game.player.hands && !game.player.hand)) return;
+        _activeBjGame = game;
+        updateBlackjackUI();
+    }
+
+    function calculateHandValue(cards) {
+        if (!cards) return 0;
+        var total = 0, aces = 0;
+        for (var i=0; i<cards.length; i++){
+            // Depending on API, might need to check if card is visible
+            if (cards[i].isFaceUp === false) continue;
+            var v = cards[i].value;
+            if (v === 'ACE') { aces++; total += 11; }
+            else if (['KING','QUEEN','JACK','TEN'].indexOf(v) !== -1) total += 10;
+            else if (v === 'NINE') total += 9;
+            else if (v === 'EIGHT') total += 8;
+            else if (v === 'SEVEN') total += 7;
+            else if (v === 'SIX') total += 6;
+            else if (v === 'FIVE') total += 5;
+            else if (v === 'FOUR') total += 4;
+            else if (v === 'THREE') total += 3;
+            else if (v === 'TWO') total += 2;
+        }
+        while(total > 21 && aces > 0) { total -= 10; aces--; }
+        return total;
+    }
+
+    function calculateBlackjackEV(hand, dealerCards) {
+        if (!hand || !dealerCards || dealerCards.length === 0) return 'WAIT';
+        var dCards = dealerCards.filter(function(c) { return c.isFaceUp !== false; });
+        if (dCards.length === 0) return 'WAIT';
+        
+        function getV(c) {
+            if (c.value === 'ACE') return 11;
+            if (['KING','QUEEN','JACK','TEN'].indexOf(c.value) !== -1) return 10;
+            var m = {'NINE':9,'EIGHT':8,'SEVEN':7,'SIX':6,'FIVE':5,'FOUR':4,'THREE':3,'TWO':2};
+            return m[c.value] || 0;
+        }
+        
+        var pTotal = calculateHandValue(hand.cards);
+        var dUp = getV(dCards[0]);
+        var possible = hand.possibleActions || ['HIT', 'STAND'];
+        var canSplit = possible.indexOf('SPLIT') !== -1;
+        var canDouble = possible.indexOf('DOUBLE') !== -1;
+        
+        var isSoft = false;
+        var tempTotal = 0, tempAces = 0;
+        for(var i=0; i<hand.cards.length; i++) { var v = getV(hand.cards[i]); if(v===11) tempAces++; tempTotal += v; }
+        while(tempTotal > 21 && tempAces > 0) { tempTotal -= 10; tempAces--; }
+        isSoft = (tempAces > 0);
+        
+        var isPair = hand.cards.length === 2 && getV(hand.cards[0]) === getV(hand.cards[1]);
+        
+        if (isPair && canSplit) {
+            var v = getV(hand.cards[0]);
+            if (v === 11 || v === 8) return 'SPLIT';
+            if (v === 9 && dUp !== 7 && dUp !== 10 && dUp !== 11) return 'SPLIT';
+            if (v === 7 && dUp >= 2 && dUp <= 7) return 'SPLIT';
+            if (v === 6 && dUp >= 2 && dUp <= 6) return 'SPLIT';
+            if (v === 4 && (dUp === 5 || dUp === 6)) return 'SPLIT';
+            if ((v === 2 || v === 3) && dUp >= 2 && dUp <= 7) return 'SPLIT';
+        }
+        
+        if (isSoft) {
+            if (pTotal >= 19) return 'STAND';
+            if (pTotal === 18) {
+                if (dUp >= 3 && dUp <= 6) return canDouble ? 'DOUBLE' : 'HIT';
+                if (dUp <= 8) return 'STAND';
+                return 'HIT';
+            }
+            if (pTotal === 17) return (dUp >= 3 && dUp <= 6 && canDouble) ? 'DOUBLE' : 'HIT';
+            if (pTotal >= 13 && pTotal <= 16) return (dUp >= 4 && dUp <= 6 && canDouble) ? 'DOUBLE' : 'HIT';
+        }
+        
+        if (pTotal >= 17) return 'STAND';
+        if (pTotal >= 13 && pTotal <= 16) return (dUp >= 2 && dUp <= 6) ? 'STAND' : 'HIT';
+        if (pTotal === 12) return (dUp >= 4 && dUp <= 6) ? 'STAND' : 'HIT';
+        if (pTotal === 11) return canDouble ? 'DOUBLE' : 'HIT';
+        if (pTotal === 10) return (dUp >= 2 && dUp <= 9 && canDouble) ? 'DOUBLE' : 'HIT';
+        if (pTotal === 9) return (dUp >= 3 && dUp <= 6 && canDouble) ? 'DOUBLE' : 'HIT';
+        
+        return 'HIT';
+    }
+
+    function updateBlackjackUI() {
+        var elBest = document.getElementById('bg-bj-best-action');
+        var elDlr = document.getElementById('bg-bj-dealer');
+        var elPly = document.getElementById('bg-bj-player');
+        var elSub = document.getElementById('bg-bj-subaction');
+        if (!elBest || typeof _activeBjGame !== 'object' || !_activeBjGame) return;
+        
+        var dCards = _activeBjGame.dealer && _activeBjGame.dealer.hand ? _activeBjGame.dealer.hand.cards : [];
+        var pHands = _activeBjGame.player.hands || (_activeBjGame.player.hand ? [_activeBjGame.player.hand] : []);
+        var activeHand = null;
+        for(var i=0; i<pHands.length; i++){
+            if (pHands[i] && pHands[i].status !== 'STANDING' && pHands[i].status !== 'ENDED' && pHands[i].status !== 'LOSE' && pHands[i].status !== 'WIN' && pHands[i].status !== 'PUSH') {
+                activeHand = pHands[i]; break;
+            }
+        }
+        if (!activeHand && pHands.length > 0) activeHand = pHands[pHands.length-1] || null;
+
+        var stateStr = '';
+        if (_activeBjGame.isInsuranceOffered) stateStr = 'INS_' + _activeBjGame.id;
+        else if (activeHand) stateStr = 'H' + activeHand.id + '_P' + activeHand.cards.length + '_D' + dCards.length;
+
+        // Trigger computing delay only on first state discovery
+        if (stateStr && stateStr !== _lastBjState) {
+            _lastBjState = stateStr;
+            _bjIsCalculating = true;
+            clearTimeout(_bjCalcTimeout);
+            
+            _bjCalcTimeout = setTimeout(function() {
+                _bjIsCalculating = false;
+                updateBlackjackUI();
+            }, 500 + Math.floor(Math.random() * 400));
+        }
+
+        // Always update text counters
+        elDlr.textContent = calculateHandValue(dCards);
+        if (activeHand) elPly.textContent = calculateHandValue(activeHand.cards);
+
+        if (_bjIsCalculating) {
+            elBest.innerHTML = 'COMPUTING<span class="bg-dots"><span>.</span><span>.</span><span>.</span></span>';
+            elBest.style.background = 'linear-gradient(135deg, #9ca3af, #d1d5db)';
+            elBest.style.webkitBackgroundClip = 'text'; elBest.style.webkitTextFillColor = 'transparent';
+            elSub.textContent = 'Running EV Mathematics...';
+            return;
+        }
+
+        if (_activeBjGame.isInsuranceOffered) {
+            elBest.textContent = 'DECLINE INS.';
+            elBest.style.background = 'linear-gradient(135deg,#f87171,#ef4444)';
+            elBest.style.webkitBackgroundClip = 'text'; elBest.style.webkitTextFillColor = 'transparent';
+            elSub.textContent = 'Basic Strategy: Never take insurance - EV';
+            return;
+        }
+        
+        if (activeHand) {
+            var ba = calculateBlackjackEV(activeHand, dCards);
+            if (ba && ba !== 'WAIT') {
+                elBest.textContent = ba;
+                if (ba === 'HIT') elBest.style.background = 'linear-gradient(135deg,#4ade80,#22c55e)';
+                else if (ba === 'STAND') elBest.style.background = 'linear-gradient(135deg,#f87171,#ef4444)';
+                else if (ba === 'DOUBLE') elBest.style.background = 'linear-gradient(135deg,#c084fc,#9333ea)';
+                else if (ba === 'SPLIT') elBest.style.background = 'linear-gradient(135deg,#38bdf8,#0ea5e9)';
+                else elBest.style.background = 'linear-gradient(135deg,#c49821,#f7d76a)';
+                
+                elBest.style.webkitBackgroundClip = 'text'; elBest.style.webkitTextFillColor = 'transparent';
+                elSub.textContent = 'Optimal Expected Value Strategy';
+                
+                playSound('predict');
+            } else {
+                elBest.textContent = 'WAIT';
+                elBest.style.background = 'rgba(255,255,255,0.4)'; elBest.style.webkitBackgroundClip = 'text'; elBest.style.webkitTextFillColor = 'transparent';
+                elSub.textContent = 'Round ended or awaiting dealer...';
+            }
+        }
+    }
+
     // ═══ BUILD UI ═══
 
     function buildPanel() {
@@ -590,6 +769,7 @@
             '<div class="bg-tab bg-active" data-tab="mines">MINES</div>' +
             '<div class="bg-tab" data-tab="towers">TOWERS</div>' +
             '<div class="bg-tab" data-tab="crash">CRASH</div>' +
+            '<div class="bg-tab" data-tab="bj">BJ</div>' +
             '</div>' +
 
             // ── MINES TAB ──
@@ -622,6 +802,17 @@
             '<button class="bg-predict-btn" id="bg-predict-crash">ANALYZE CRASH</button>' +
             '<div class="bg-result" id="bg-result-crash"></div>' +
             '<div class="bg-crash-display" id="bg-crash-display"></div>' +
+            '</div>' +
+
+            // ── BLACKJACK TAB ──
+            '<div class="bg-tab-content" id="bg-tab-bj">' +
+            '<div class="bg-result" id="bg-result-bj"></div>' +
+            '<div id="bg-blackjack-container" style="text-align:center;padding:10px 0;">' +
+            '  <div style="font-size:11px;color:#888;margin-bottom:8px">DEALER: <span id="bg-bj-dealer" style="color:#fff;font-weight:bold">0</span></div>' +
+            '  <div style="font-size:11px;color:#888;margin-bottom:12px">PLAYER: <span id="bg-bj-player" style="color:#fff;font-weight:bold">0</span></div>' +
+            '  <div id="bg-bj-best-action" style="font-size:32px;font-weight:800;letter-spacing:-0.5px;margin-bottom:4px;color:#fff">WAIT</div>' +
+            '  <div id="bg-bj-subaction" style="font-size:10px;color:#777">Awaiting round start...</div>' +
+            '</div>' +
             '</div>' +
 
             '<div class="bg-log" id="bg-log"></div>' +
@@ -708,8 +899,22 @@
     }
 
     if (document.readyState === 'complete' || document.readyState === 'interactive') {
-        setTimeout(init, 1000);
+        setTimeout(init, 500);
     } else {
-        window.addEventListener('DOMContentLoaded', function () { setTimeout(init, 1000); });
+        window.addEventListener('DOMContentLoaded', function () { setTimeout(init, 500); });
     }
+
+    // Single Page Application (SPA) Support for route changes
+    var _lastHref = location.href;
+    setInterval(function() {
+        if (_lastHref !== location.href) {
+            _lastHref = location.href;
+            log('navigated to: ' + location.pathname);
+            // Switch tabs intelligently based on URL
+            if (location.pathname.indexOf('blackjack') !== -1) document.querySelector('.bg-tab[data-tab="bj"]')?.click();
+            else if (location.pathname.indexOf('crash') !== -1) document.querySelector('.bg-tab[data-tab="crash"]')?.click();
+            else if (location.pathname.indexOf('towers') !== -1) document.querySelector('.bg-tab[data-tab="towers"]')?.click();
+            else if (location.pathname.indexOf('mines') !== -1) document.querySelector('.bg-tab[data-tab="mines"]')?.click();
+        }
+    }, 1000);
 })();
