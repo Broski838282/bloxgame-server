@@ -317,6 +317,8 @@
 
     var selectedTileCount = 3;
     var selectedGrid = 16; // 4x4 default
+    var _lastMinesCache = { state: '', data: null };
+    var _lastTowersCache = { state: '', data: null };
 
     async function runMinesPrediction() {
         var game = _interceptedMinesGame;
@@ -340,17 +342,27 @@
         playSound('predict');
         
         var opened = [];
-        var mc = 1, gridSize = selectedGrid, serverHash = '';
+        var mc = 1, serverHash = '';
 
         if (game) {
             mc = game.minesAmount || 1;
-            gridSize = game.gridSize || selectedGrid;
+            selectedGrid = game.gridSize || selectedGrid;
             opened = game.uncoveredLocations || [];
             serverHash = game.serverHash || '';
         }
 
+        var stateStr = opened.join(',') + '_' + selectedGrid + '_' + mc + '_' + selectedTileCount;
+        if (_lastMinesCache.state === stateStr && _lastMinesCache.data) {
+            var data = _lastMinesCache.data;
+            renderMinesSafeGrid(data.allScores || {}, opened, data.picks, selectedGrid);
+            bindTileHovers(data.allScores || {}, data.picks, opened);
+            var pickText = data.picks.map(function (p) { return '#' + p.tile; }).join(', ');
+            showResult('mines', 'SAFE TILES: ' + pickText + ' · ' + (data.confidence || 50) + '%', 'success');
+            return;
+        }
+
         var result = await serverFetch('POST', '/api/predict/mines', {
-            game: { mc: mc, gridSize: gridSize, opened: opened, serverHash: serverHash, tileCount: selectedTileCount },
+            game: { mc: mc, gridSize: selectedGrid, opened: opened, serverHash: serverHash, tileCount: selectedTileCount },
             history: minesHistory
         });
 
@@ -362,6 +374,9 @@
         }
 
         var data = unpackMinesResponse(result);
+        _lastMinesCache.state = stateStr;
+        _lastMinesCache.data = data;
+
         var picks = data.picks || [];
         var confidence = data.confidence || 50;
 
@@ -374,7 +389,7 @@
         }
 
         // Render safe grid inside UI
-        renderMinesSafeGrid(data.allScores || {}, opened, picks, gridSize);
+        renderMinesSafeGrid(data.allScores || {}, opened, picks, selectedGrid);
 
         // Highlight actual DOM tiles on screen
         bindTileHovers(data.allScores || {}, picks, opened);
@@ -412,6 +427,13 @@
             difficulty = game.difficulty || 'easy';
         }
 
+        var stateStr = completedLevels.join(',') + '_' + difficulty;
+        if (_lastTowersCache.state === stateStr && _lastTowersCache.data) {
+            renderTowersGrid(_lastTowersCache.data.predictions || [], completedLevels);
+            showResult('towers', 'NEXT: Column ' + (_lastTowersCache.data.nextPick + 1) + ' (Level ' + (_lastTowersCache.data.nextLevel + 1) + ') · ' + (_lastTowersCache.data.confidence || 50) + '%', 'success');
+            return;
+        }
+
         var result = await serverFetch('POST', '/api/predict/towers', {
             game: { completedLevels: completedLevels, difficulty: difficulty },
             history: towersHistory
@@ -425,6 +447,9 @@
         }
 
         var data = unpackTowersResponse(result);
+        _lastTowersCache.state = stateStr;
+        _lastTowersCache.data = data;
+        
         renderTowersGrid(data.predictions || [], completedLevels);
 
         var conf = data.confidence || 50;
