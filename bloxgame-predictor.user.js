@@ -617,13 +617,35 @@
     var _bjCalcTimeout = null;
 
     function handleBlackjackData(payload) {
-        var game = payload.game || payload;
-        // If the game ended or we missed data
-        if (!game || !game.player || (!game.player.hands && !game.player.hand)) {
+        var game = payload.game || payload.state || payload;
+        
+        // Aggressively map alternate Bloxgame Blackjack schemas
+        if (!game.dealer) game.dealer = {};
+        if (!game.player) game.player = {};
+
+        if (game.dealerCards) game.dealer = { hand: { cards: game.dealerCards } };
+        else if (game.dealerHand) game.dealer = { hand: game.dealerHand };
+
+        if (!game.dealer.hand && game.dealer.cards) game.dealer.hand = { cards: game.dealer.cards };
+
+        if (game.playerCards) game.player = { hands: [{ cards: game.playerCards }] };
+        else if (game.userCards) game.player = { hands: [{ cards: game.userCards }] };
+        else if (game.playerHand) game.player = { hands: [game.playerHand] };
+        
+        if (game.player.hand && !game.player.hands) game.player.hands = [game.player.hand];
+        if (game.player.hands && game.player.hands.length > 0) {
+            game.player.hands.forEach(function(h) {
+                 if(!h.cards && h.player_cards) h.cards = h.player_cards;
+            });
+        }
+
+        // If the game ended or we missed data completely
+        if (!game || !game.player || !game.player.hands || game.player.hands.length === 0) {
             _activeBjGame = null;
             updateBlackjackUI();
             return;
         }
+        
         _activeBjGame = game;
         updateBlackjackUI();
     }
@@ -714,7 +736,7 @@
         var elSub = document.getElementById('bg-bj-subaction');
         if (!elBest) return;
 
-        if (typeof _activeBjGame !== 'object' || !_activeBjGame || _activeBjGame.active === false) {
+        if (typeof _activeBjGame !== 'object' || !_activeBjGame) {
             elDlr.textContent = '0';
             elPly.textContent = '0';
             elBest.textContent = 'WAIT';
@@ -723,8 +745,8 @@
             return;
         }
         
-        var dCards = _activeBjGame.dealer && _activeBjGame.dealer.hand ? _activeBjGame.dealer.hand.cards : [];
-        var pHands = _activeBjGame.player.hands || (_activeBjGame.player.hand ? [_activeBjGame.player.hand] : []);
+        var dCards = _activeBjGame.dealer && _activeBjGame.dealer.hand && _activeBjGame.dealer.hand.cards ? _activeBjGame.dealer.hand.cards : [];
+        var pHands = _activeBjGame.player && _activeBjGame.player.hands ? _activeBjGame.player.hands : [];
         var activeHand = null;
         for(var i=0; i<pHands.length; i++){
             if (pHands[i] && pHands[i].status !== 'STANDING' && pHands[i].status !== 'ENDED' && pHands[i].status !== 'LOSE' && pHands[i].status !== 'WIN' && pHands[i].status !== 'PUSH') {
