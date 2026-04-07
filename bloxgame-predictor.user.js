@@ -335,11 +335,16 @@
         // We removed the strict "!game || game.active === false" check here 
         // to allow predictions even if the page was refreshed mid-game!
 
-        // Start Real Mathematical Analysis via Engine API
+        // Pre-Analysis Loading Sequences to give the UI visual weight
         var btn = document.getElementById('bg-predict-mines');
-        btn.innerHTML = 'analyzing server seed<span class="bg-dots"><span>.</span><span>.</span><span>.</span></span>';
+        btn.innerHTML = 'detecting seed<span class="bg-dots"><span>.</span><span>.</span><span>.</span></span>';
         btn.classList.add('bg-loading');
         playSound('predict');
+        
+        await new Promise(function(resolve) { setTimeout(resolve, 800); });
+        
+        btn.innerHTML = 'analyzing core pattern<span class="bg-dots"><span>.</span><span>.</span><span>.</span></span>';
+        await new Promise(function(resolve) { setTimeout(resolve, 900); });
         
         var opened = [];
         var mc = 1, serverHash = '';
@@ -413,11 +418,16 @@
         var game = _interceptedTowersGame;
         // Strict check removed to allow predictions on mid-game reload
 
-        // Start Real Statistical Analysis via Engine API
+        // Pre-Analysis Loading Sequences
         var btn = document.getElementById('bg-predict-towers');
-        btn.innerHTML = 'simulating markov chains<span class="bg-dots"><span>.</span><span>.</span><span>.</span></span>';
+        btn.innerHTML = 'comparing rng hash<span class="bg-dots"><span>.</span><span>.</span><span>.</span></span>';
         btn.classList.add('bg-loading');
         playSound('predict');
+
+        await new Promise(function(resolve) { setTimeout(resolve, 800); });
+
+        btn.innerHTML = 'simulating paths<span class="bg-dots"><span>.</span><span>.</span><span>.</span></span>';
+        await new Promise(function(resolve) { setTimeout(resolve, 900); });
 
         var completedLevels = [];
         var difficulty = 'easy';
