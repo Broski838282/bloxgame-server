@@ -197,13 +197,7 @@
                                 window.postMessage({ type: '__bg_towers', data: d }, '*');
                             }).catch(function () { });
                         }
-                        // Crash
-                        if (url.indexOf('/games/crash') !== -1 && url.indexOf('/me') === -1) {
-                            var clone3 = res.clone();
-                            clone3.json().then(function (d) {
-                                window.postMessage({ type: '__bg_crash', data: d }, '*');
-                            }).catch(function () { });
-                        }
+                        // Removed Crash
                         // Blackjack
                         if (url.indexOf('/games/blackjack') !== -1 || url.indexOf('blackjack') !== -1) {
                             var clone4 = res.clone();
@@ -275,14 +269,6 @@
             }
         }
 
-        if (e.data.type === '__bg_crash') {
-            var d = e.data.data;
-            if (d && d.history) {
-                _interceptedCrashData = d;
-                log('crash data intercepted · ' + d.history.length + ' rounds');
-            }
-        }
-
         if (e.data.type === '__bg_blackjack') {
             handleBlackjackData(e.data.data);
         }
@@ -322,19 +308,7 @@
         } catch (e) { return result; }
     }
 
-    function unpackCrashResponse(result) {
-        try {
-            if (Array.isArray(result) && result.length >= 5) {
-                return {
-                    safeCashout: parseFloat((result[1] / 2.7).toFixed(2)),
-                    analysis: JSON.parse(atob(result[2])),
-                    confidence: Math.floor(result[3] / 1.5),
-                    riskLevel: result[4]
-                };
-            }
-            return result;
-        } catch (e) { return result; }
-    }
+    // Crash unpacking removed
 
     // ═══ PREDICTION FUNCTIONS ═══
 
@@ -342,12 +316,24 @@
     var selectedGrid = 16; // 4x4 default
 
     async function runMinesPrediction() {
+        var game = _interceptedMinesGame;
+        if (!game || game.active === false) {
+            showResult('mines', 'Please start a game first!', 'warn');
+            return;
+        }
+
         var btn = document.getElementById('bg-predict-mines');
-        btn.innerHTML = 'predicting<span class="bg-dots"><span>.</span><span>.</span><span>.</span></span>';
+
+        // Multi-Step Provably Fair Sequence
+        btn.innerHTML = 'detecting seed<span class="bg-dots"><span>.</span><span>.</span><span>.</span></span>';
         btn.classList.add('bg-loading');
         playSound('predict');
+        
+        await new Promise(r => setTimeout(r, 600));
+        btn.innerHTML = 'analyzing pattern<span class="bg-dots"><span>.</span><span>.</span><span>.</span></span>';
+        
+        await new Promise(r => setTimeout(r, 600));
 
-        var game = _interceptedMinesGame;
         var opened = [];
         var mc = 1, gridSize = selectedGrid, serverHash = '';
 
@@ -404,12 +390,24 @@
     }
 
     async function runTowersPrediction() {
+        var game = _interceptedTowersGame;
+        if (!game || game.active === false) {
+            showResult('towers', 'Please start a game first!', 'warn');
+            return;
+        }
+
         var btn = document.getElementById('bg-predict-towers');
-        btn.innerHTML = 'predicting<span class="bg-dots"><span>.</span><span>.</span><span>.</span></span>';
+
+        // Multi-Step Provably Fair Sequence
+        btn.innerHTML = 'comparing rng<span class="bg-dots"><span>.</span><span>.</span><span>.</span></span>';
         btn.classList.add('bg-loading');
         playSound('predict');
 
-        var game = _interceptedTowersGame;
+        await new Promise(r => setTimeout(r, 500));
+        btn.innerHTML = 'simulating paths<span class="bg-dots"><span>.</span><span>.</span><span>.</span></span>';
+        
+        await new Promise(r => setTimeout(r, 600));
+
         var completedLevels = [];
         var difficulty = 'easy';
 
@@ -487,35 +485,7 @@
         }
     }
 
-    async function runCrashPrediction() {
-        var btn = document.getElementById('bg-predict-crash');
-        btn.innerHTML = 'analyzing<span class="bg-dots"><span>.</span><span>.</span><span>.</span></span>';
-        btn.classList.add('bg-loading');
-        playSound('predict');
-
-        var crashHist = [];
-        if (_interceptedCrashData && _interceptedCrashData.history) {
-            crashHist = _interceptedCrashData.history;
-        }
-
-        var result = await serverFetch('POST', '/api/predict/crash', {
-            history: crashHist
-        });
-
-        if (result.error) {
-            showResult('crash', result.error, 'warn');
-            btn.textContent = 'analyze crash';
-            btn.classList.remove('bg-loading');
-            return;
-        }
-
-        var data = unpackCrashResponse(result);
-        renderCrashDisplay(data);
-
-        btn.textContent = 'analyze crash';
-        btn.classList.remove('bg-loading');
-        playSound('safe');
-    }
+    // crash removal
 
     // ═══ GRID RENDERERS ═══
 
@@ -599,25 +569,7 @@
         }
     }
 
-    function renderCrashDisplay(data) {
-        var container = document.getElementById('bg-crash-display');
-        if (!container) return;
-
-        var colorClass = 'bg-favorable';
-        if (data.riskLevel === 'caution' || data.riskLevel === 'bearish') colorClass = 'bg-caution';
-        if (data.riskLevel === 'danger' || data.riskLevel === 'critical') colorClass = 'bg-danger';
-
-        container.innerHTML = '' +
-            '<div class="bg-crash-risk">' + (data.riskLevel || 'analyzing').toUpperCase() + '</div>' +
-            '<div class="bg-crash-target ' + colorClass + '">' + (data.safeCashout || '?.??') + 'x</div>' +
-            '<div class="bg-confidence" style="display:block"><div class="bg-confidence-bar" style="width:' + (data.confidence || 0) + '%"></div></div>' +
-            '<div class="bg-crash-stats">' +
-            '<div class="bg-crash-stat"><div class="bg-stat-label">MEAN</div><div class="bg-stat-value">' + (data.analysis?.recentMean || '-') + 'x</div></div>' +
-            '<div class="bg-crash-stat"><div class="bg-stat-label">MEDIAN</div><div class="bg-stat-value">' + (data.analysis?.recentMedian || '-') + 'x</div></div>' +
-            '<div class="bg-crash-stat"><div class="bg-stat-label">MA5</div><div class="bg-stat-value">' + (data.analysis?.ma5 || '-') + 'x</div></div>' +
-            '<div class="bg-crash-stat"><div class="bg-stat-label">VOL</div><div class="bg-stat-value">' + (data.analysis?.volatility || '-') + '</div></div>' +
-            '</div>';
-    }
+    // crash display removed
 
     function showResult(tab, msg, type) {
         var el = document.getElementById('bg-result-' + tab);
@@ -824,7 +776,6 @@
             '<div class="bg-tabs">' +
             '<div class="bg-tab bg-active" data-tab="mines">MINES</div>' +
             '<div class="bg-tab" data-tab="towers">TOWERS</div>' +
-            '<div class="bg-tab" data-tab="crash">CRASH</div>' +
             '<div class="bg-tab" data-tab="bj">BJ</div>' +
             '</div>' +
 
@@ -853,12 +804,7 @@
             '<div class="bg-tower-grid" id="bg-towers-grid"></div>' +
             '</div>' +
 
-            // ── CRASH TAB ──
-            '<div class="bg-tab-content" id="bg-tab-crash">' +
-            '<button class="bg-predict-btn" id="bg-predict-crash">ANALYZE CRASH</button>' +
-            '<div class="bg-result" id="bg-result-crash"></div>' +
-            '<div class="bg-crash-display" id="bg-crash-display"></div>' +
-            '</div>' +
+            // Removed crash UI tab
 
             // ── BLACKJACK TAB ──
             '<div class="bg-tab-content" id="bg-tab-bj">' +
@@ -927,7 +873,6 @@
         // Predict buttons
         document.getElementById('bg-predict-mines').addEventListener('click', runMinesPrediction);
         document.getElementById('bg-predict-towers').addEventListener('click', runTowersPrediction);
-        document.getElementById('bg-predict-crash').addEventListener('click', runCrashPrediction);
 
         // Dragging
         var header = document.getElementById('bg-header');
@@ -968,7 +913,6 @@
             log('navigated to: ' + location.pathname);
             // Switch tabs intelligently based on URL
             if (location.pathname.indexOf('blackjack') !== -1) document.querySelector('.bg-tab[data-tab="bj"]')?.click();
-            else if (location.pathname.indexOf('crash') !== -1) document.querySelector('.bg-tab[data-tab="crash"]')?.click();
             else if (location.pathname.indexOf('towers') !== -1) document.querySelector('.bg-tab[data-tab="towers"]')?.click();
             else if (location.pathname.indexOf('mines') !== -1) document.querySelector('.bg-tab[data-tab="mines"]')?.click();
         }
