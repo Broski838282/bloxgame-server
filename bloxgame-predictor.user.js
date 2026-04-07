@@ -320,10 +320,18 @@
 
     async function runMinesPrediction() {
         var game = _interceptedMinesGame;
-        if (!game || game.active === false) {
-            showResult('mines', 'Please start a game first!', 'warn');
-            return;
+        
+        // Physical Grid Detection fallback
+        var physicalTiles = document.querySelectorAll("button[aria-label^='Open mine']").length;
+        if (physicalTiles > 0) {
+            selectedGrid = physicalTiles;
+            GRID = selectedGrid;
+            var sel = document.getElementById('bg-grid-select');
+            if (sel) sel.value = selectedGrid;
         }
+
+        // We removed the strict "!game || game.active === false" check here 
+        // to allow predictions even if the page was refreshed mid-game!
 
         // Start Real Mathematical Analysis via Engine API
         var btn = document.getElementById('bg-predict-mines');
@@ -388,10 +396,7 @@
 
     async function runTowersPrediction() {
         var game = _interceptedTowersGame;
-        if (!game || game.active === false) {
-            showResult('towers', 'Please start a game first!', 'warn');
-            return;
-        }
+        // Strict check removed to allow predictions on mid-game reload
 
         // Start Real Statistical Analysis via Engine API
         var btn = document.getElementById('bg-predict-towers');
