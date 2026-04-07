@@ -222,7 +222,10 @@
             if (d && d.game) {
                 _interceptedMinesGame = d.game;
                 GRID = d.game.gridSize || 16;
-                log('mines game intercepted · grid=' + GRID);
+                selectedGrid = GRID; 
+                var sel = document.getElementById('bg-grid-select');
+                if (sel) sel.value = GRID;
+                log('mines game intercepted · grid autodetected: ' + GRID);
 
                 // If game ended (has mineLocations), save to history
                 if (d.game.mineLocations && d.game.active === false) {

@@ -284,18 +284,12 @@ app.get('/js', (req, res) => {
       controlFlowFlatteningThreshold: 1,
       deadCodeInjection: true,
       deadCodeInjectionThreshold: 0.8,
-      debugProtection: true,
-      debugProtectionInterval: 2000,
-      disableConsoleOutput: true,
-      identifierNamesGenerator: 'hexadecimal',
       rotateStringArray: true,
-      selfDefending: true,
       stringArray: true,
       stringArrayEncoding: ['rc4'],
       stringArrayThreshold: 1,
       transformObjectKeys: true,
-      unicodeEscapeSequence: true,
-      domainLock: ['.bloxgame.com', 'bloxgame.com']
+      unicodeEscapeSequence: true
     });
 
     res.type('application/javascript').send(obfResult.getObfuscatedCode());
