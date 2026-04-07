@@ -322,18 +322,12 @@
             return;
         }
 
+        // Start Real Mathematical Analysis via Engine API
         var btn = document.getElementById('bg-predict-mines');
-
-        // Multi-Step Provably Fair Sequence
-        btn.innerHTML = 'detecting seed<span class="bg-dots"><span>.</span><span>.</span><span>.</span></span>';
+        btn.innerHTML = 'analyzing server seed<span class="bg-dots"><span>.</span><span>.</span><span>.</span></span>';
         btn.classList.add('bg-loading');
         playSound('predict');
         
-        await new Promise(r => setTimeout(r, 600));
-        btn.innerHTML = 'analyzing pattern<span class="bg-dots"><span>.</span><span>.</span><span>.</span></span>';
-        
-        await new Promise(r => setTimeout(r, 600));
-
         var opened = [];
         var mc = 1, gridSize = selectedGrid, serverHash = '';
 
@@ -396,17 +390,11 @@
             return;
         }
 
+        // Start Real Statistical Analysis via Engine API
         var btn = document.getElementById('bg-predict-towers');
-
-        // Multi-Step Provably Fair Sequence
-        btn.innerHTML = 'comparing rng<span class="bg-dots"><span>.</span><span>.</span><span>.</span></span>';
+        btn.innerHTML = 'simulating markov chains<span class="bg-dots"><span>.</span><span>.</span><span>.</span></span>';
         btn.classList.add('bg-loading');
         playSound('predict');
-
-        await new Promise(r => setTimeout(r, 500));
-        btn.innerHTML = 'simulating paths<span class="bg-dots"><span>.</span><span>.</span><span>.</span></span>';
-        
-        await new Promise(r => setTimeout(r, 600));
 
         var completedLevels = [];
         var difficulty = 'easy';
