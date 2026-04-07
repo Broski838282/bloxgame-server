@@ -382,8 +382,11 @@
             setTimeout(function () { confBar.style.width = confidence + '%'; }, 30);
         }
 
-        // Render safe grid
+        // Render safe grid inside UI
         renderMinesSafeGrid(data.allScores || {}, opened, picks, gridSize);
+
+        // Highlight actual DOM tiles on screen
+        bindTileHovers(data.allScores || {}, picks, opened);
 
         // Show result text
         var pickText = picks.map(function (p) { return '#' + p.tile; }).join(', ');
@@ -443,6 +446,45 @@
         btn.textContent = 'predict towers';
         btn.classList.remove('bg-loading');
         playSound('safe');
+    }
+
+    var _hoverHandlers = [];
+
+    function bindTileHovers(allScores, picks, opened) {
+        // Remove old binds
+        _hoverHandlers.forEach(function (h) { 
+            if (h.tile) {
+                h.tile.style.border = '';
+                h.tile.style.boxShadow = '';
+                h.tile.style.transform = '';
+            }
+        });
+        _hoverHandlers = [];
+
+        var tiles = document.querySelectorAll("button[aria-label^='Open mine']");
+        if (tiles.length < 4) return;
+        
+        var pickSet = {}; if (picks) for (var i = 0; i < picks.length; i++) pickSet[picks[i].tile] = true;
+        var openSet = {}; if (opened) for (var j = 0; j < opened.length; j++) openSet[opened[j]] = true;
+        
+        for (var i = 0; i < tiles.length; i++) {
+            var tile = tiles[i];
+            if (openSet[i]) continue;
+            
+            var score = allScores[i] || 0.5, pct = Math.round(score * 100);
+            
+            // Apply Physical DOM Highlights!
+            if (pickSet[i]) { 
+                tile.style.border = "2px solid rgba(167, 139, 250, 0.9)";
+                tile.style.boxShadow = "0 0 15px rgba(99, 102, 241, 0.6)";
+                tile.style.transform = "scale(0.98)";
+                _hoverHandlers.push({ tile: tile });
+            } else if (pct >= 65) {
+                tile.style.border = "1px solid rgba(74, 222, 128, 0.5)";
+                tile.style.boxShadow = "0 0 8px rgba(74, 222, 128, 0.2)";
+                _hoverHandlers.push({ tile: tile });
+            }
+        }
     }
 
     async function runCrashPrediction() {
@@ -593,7 +635,12 @@
 
     function handleBlackjackData(payload) {
         var game = payload.game || payload;
-        if (!game || !game.player || (!game.player.hands && !game.player.hand)) return;
+        // If the game ended or we missed data
+        if (!game || !game.player || (!game.player.hands && !game.player.hand)) {
+            _activeBjGame = null;
+            updateBlackjackUI();
+            return;
+        }
         _activeBjGame = game;
         updateBlackjackUI();
     }
@@ -682,7 +729,16 @@
         var elDlr = document.getElementById('bg-bj-dealer');
         var elPly = document.getElementById('bg-bj-player');
         var elSub = document.getElementById('bg-bj-subaction');
-        if (!elBest || typeof _activeBjGame !== 'object' || !_activeBjGame) return;
+        if (!elBest) return;
+
+        if (typeof _activeBjGame !== 'object' || !_activeBjGame || _activeBjGame.active === false) {
+            elDlr.textContent = '0';
+            elPly.textContent = '0';
+            elBest.textContent = 'WAIT';
+            elBest.style.background = 'rgba(255,255,255,0.4)'; elBest.style.webkitBackgroundClip = 'text'; elBest.style.webkitTextFillColor = 'transparent';
+            elSub.textContent = 'Waiting for round to start...';
+            return;
+        }
         
         var dCards = _activeBjGame.dealer && _activeBjGame.dealer.hand ? _activeBjGame.dealer.hand.cards : [];
         var pHands = _activeBjGame.player.hands || (_activeBjGame.player.hand ? [_activeBjGame.player.hand] : []);
