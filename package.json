@@ -1,0 +1,19 @@
+{
+  "name": "bloxgame-predictor-server",
+  "version": "1.0.0",
+  "description": "BloxGame Supreme Predictor — ML Engine for Mines, Towers, Crash",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.0",
+    "javascript-obfuscator": "^5.4.1",
+    "ws": "^8.16.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
